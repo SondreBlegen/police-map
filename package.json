@@ -16,13 +16,15 @@
   "devDependencies": {
     "@types/dotenv": "^8.2.0",
     "@types/node": "^12.12.17",
+    "@types/twitter": "^1.7.0",
     "@types/winston": "^2.4.4",
     "dotenv": "^8.2.0",
     "dotenv-extended": "^2.6.0"
   },
   "dependencies": {
-    "winston": "^3.2.1",
+    "tslint": "^5.20.1",
+    "twitter": "^1.7.1",
     "typescript": "^3.7.3",
-    "tslint": "^5.20.1"
+    "winston": "^3.2.1"
   }
 }
