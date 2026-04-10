@@ -28,5 +28,5 @@ backend/PoliceMap.Api/obj/
 .DS_Store
 Thumbs.db
 
-# Old boilerplate
-src/
+# Old boilerplate (root only)
+/src/

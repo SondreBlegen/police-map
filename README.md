@@ -46,3 +46,31 @@ Runs on `http://localhost:5173` with API proxy to the backend.
 | POST | `/api/fetch` | Trigger manual data fetch |
 
 All GET endpoints support optional query params: `district`, `category`, `from`, `to`.
+
+## GitHub Pages Deployment
+
+The app can also run as a static site on GitHub Pages — no backend needed.
+
+A GitHub Actions workflow (`deploy-gh-pages.yml`) handles everything:
+
+1. Runs hourly (and on push to main)
+2. Fetches live data from the Politiloggen API via `scripts/fetch-data.mjs`
+3. Merges with previously fetched data (stored on a `data-store` branch)
+4. Builds the frontend in static mode and deploys to GitHub Pages
+
+### Setup
+
+1. Go to repo **Settings > Pages** and set source to **GitHub Actions**
+2. The workflow will run automatically, or trigger it manually from the Actions tab
+3. To add more districts, edit the `--districts` flag in the workflow file
+
+The static frontend loads `data/incidents.json` and filters client-side — all filtering by district, category, and date still works.
+
+### Adding more districts
+
+Edit `scripts/fetch-data.mjs` or the workflow's `--districts` flag:
+
+```yaml
+# In .github/workflows/deploy-gh-pages.yml
+run: node scripts/fetch-data.mjs --districts sor-vest,oslo,vest --merge
+```

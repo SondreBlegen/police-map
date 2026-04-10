@@ -1,0 +1,90 @@
+name: Fetch Data & Deploy to GitHub Pages
+
+on:
+  schedule:
+    # Run every hour
+    - cron: "0 * * * *"
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [main, master]
+    paths:
+      - "frontend/**"
+      - "scripts/**"
+      - ".github/workflows/deploy-gh-pages.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  fetch-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Restore previously fetched data from the data branch (if it exists)
+      - name: Restore existing data
+        run: |
+          git fetch origin data-store --depth=1 || true
+          if git rev-parse origin/data-store >/dev/null 2>&1; then
+            git checkout origin/data-store -- frontend/public/data/incidents.json || true
+            echo "Restored existing data"
+          else
+            echo "No existing data branch found, starting fresh"
+          fi
+
+      - name: Fetch police log data
+        run: node scripts/fetch-data.mjs --districts sor-vest --merge
+
+      # Save data to a dedicated branch for persistence across runs
+      - name: Persist data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create orphan branch for data if it doesn't exist
+          git stash push -- frontend/public/data/incidents.json
+          git checkout --orphan data-store-tmp || git checkout data-store-tmp
+          git reset --hard
+          git stash pop
+          mkdir -p frontend/public/data
+          git add frontend/public/data/incidents.json
+          git commit -m "Update incident data $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No data changes"
+          git push origin HEAD:data-store --force || echo "Push failed, continuing"
+
+          # Switch back
+          git checkout -
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend (static mode)
+        working-directory: frontend
+        env:
+          VITE_STATIC_DATA: "true"
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
