@@ -53,18 +53,40 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create orphan branch for data if it doesn't exist
-          git stash push -- frontend/public/data/incidents.json
-          git checkout --orphan data-store-tmp || git checkout data-store-tmp
-          git reset --hard
-          git stash pop
-          mkdir -p frontend/public/data
-          git add frontend/public/data/incidents.json
-          git commit -m "Update incident data $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No data changes"
-          git push origin HEAD:data-store --force || echo "Push failed, continuing"
+          DATA_FILE="frontend/public/data/incidents.json"
+          if [ ! -f "$DATA_FILE" ]; then
+            echo "No data file to persist"
+            exit 0
+          fi
 
-          # Switch back
-          git checkout -
+          # Copy data to a temp location outside git
+          TMPFILE=$(mktemp)
+          cp "$DATA_FILE" "$TMPFILE"
+
+          # Stash any other in-progress changes and remember current branch
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+          # Build the data branch cleanly using a fresh worktree
+          WORKTREE=$(mktemp -d)
+          git worktree add --orphan -b data-store-work "$WORKTREE"
+
+          # Populate worktree with just the data file
+          mkdir -p "$WORKTREE/frontend/public/data"
+          cp "$TMPFILE" "$WORKTREE/frontend/public/data/incidents.json"
+
+          cd "$WORKTREE"
+          git add frontend/public/data/incidents.json
+          if git diff --cached --quiet; then
+            echo "No data changes to persist"
+          else
+            git commit -m "Update incident data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push origin HEAD:data-store --force
+          fi
+
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force "$WORKTREE"
+          git branch -D data-store-work 2>/dev/null || true
+          rm -f "$TMPFILE"
 
       - name: Install frontend dependencies
         working-directory: frontend
