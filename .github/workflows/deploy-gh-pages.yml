@@ -1,9 +1,9 @@
 name: Fetch Data & Deploy to GitHub Pages
 
 on:
-  schedule:
+  #schedule:
     # Run every hour
-    - cron: "0 * * * *"
+    #- cron: "0 * * * *"
   workflow_dispatch: # Allow manual trigger
   push:
     branches: [main, master]
